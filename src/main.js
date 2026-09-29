@@ -11,13 +11,14 @@ let near_plane = 0.1;
 let far_plane = 500;
 let fps = 60;
 let draw_wireframe = false;
-let debug_mode = true;
-let backface_culling = true;
-let texture = new Texture("/scenes/textures/spyro-the-dragon.png");
+let debug_mode = false;
+let texture = new Texture("./scenes/textures/spyro-the-dragon.png");
+let yaw = 0;
 
 let rotation = [0, 3, 3];
 let light_dir = [-1, -1, 0];
 let cam_loc = [0, 0, 0];
+let cam_look_dir = [0, 0, 1];
 
 let vert_times = [];
 let frag_times = [];
@@ -34,27 +35,36 @@ let c_buffer = ctx.createImageData(canvas.width, canvas.height);
 let frame_counter = 0;
 
 // Pre-calculation
-let cam_up, cam_look_dir, cam_target
+let cam_up, cam_target;
 let world_mat, view_mat, proj_mat;
 let planes;
 
 recalculate();
 function recalculate() {
-    cam_up = vector.add(cam_loc, [0, 1, 0]);
-    cam_look_dir = vector.add(cam_loc, [0, 0, 1]);
+    cam_up = [0, 1, 0];
+    cam_look_dir = matrix.mult_vec(matrix.rot_y(yaw), [0, 0, 1]);
     cam_target = vector.add(cam_loc, cam_look_dir);
 
     world_mat = matrix.calc_world_mat(rotation);
     view_mat = matrix.calc_view_mat(cam_loc, cam_target, cam_up);
     proj_mat = matrix.projection(fov, aspect_ratio, near_plane, far_plane);
 
+    // planes = [
+    //     [[cam_loc[0], cam_loc[1], near_plane], [cam_loc[0], cam_loc[1], 1]],    // near
+    //     [[cam_loc[0], cam_loc[1], far_plane], [cam_loc[0], cam_loc[1], -1]],    // far
+    //     [cam_loc, vector.add(cam_loc, [-1, 0, 1])],                             // right
+    //     [cam_loc, vector.add(cam_loc, [1, 0, 1])],                              // left
+    //     // [cam_loc, vector.add(cam_loc, [0, 1, 1])],                              // top
+    //     // [cam_loc, vector.add(cam_loc, [0, -1, 5])],                             // bottom
+    // ];
+
     planes = [
-        [[cam_loc[0], cam_loc[1], near_plane], [cam_loc[0], cam_loc[1], 1]],    // near
-        [[cam_loc[0], cam_loc[1], far_plane], [cam_loc[0], cam_loc[1], -1]],    // far
-        [cam_loc, vector.add(cam_loc, [-1, 0, 1])],                             // right
-        [cam_loc, vector.add(cam_loc, [1, 0, 1])],                              // left
-        [cam_loc, vector.add(cam_loc, [0, 1, 1])],                              // top
-        [cam_loc, vector.add(cam_loc, [0, -1, 1])],                             // bottom
+        [[0, 0, near_plane], [0, 0, 1]],    // near
+        [[0, 0, far_plane], [0, 0, -1]],    // far
+        [[0, 0, 0], [-1, 0, 1]],                             // right
+        [[0, 0, 0], [1, 0, 1]],                              // left
+        [[0, 0, 0], [0, 1, 1]],                              // top
+        [[0, 0, 0], [0, -1, 1]],                             // bottom
     ];
 }
 
@@ -80,25 +90,37 @@ document.addEventListener("keydown", ({ key }) => {
         }
 
         case "w": {
-            cam_loc = vector.add(cam_loc, vector.mul(cam_look_dir, 8));
+            cam_loc = vector.add(cam_loc, cam_look_dir);
             recalculate();
             break;
         }
 
         case "a": {
-            rotation[1] += 0.1;
+            yaw += 0.1;
             recalculate();
             break;
         }
 
         case "s": {
-            cam_loc = vector.sub(cam_loc, vector.mul(cam_look_dir, 8));
+            cam_loc = vector.sub(cam_loc, cam_look_dir);
             recalculate();
             break;
         }
 
         case "d": {
-            rotation[1] -= 0.1;
+            yaw -= 0.1;
+            recalculate();
+            break;
+        }
+
+        case "ArrowUp": {
+            cam_loc[1] -= 1;
+            recalculate();
+            break;
+        }
+
+        case "ArrowDown": {
+            cam_loc[1] += 1;
             recalculate();
             break;
         }
@@ -161,10 +183,10 @@ function render_loop() {
         frag_times.push(frag_end - frag_begin);
     } else {
         // Call Vertex Shader (runs once per triangle)
-        for (let i = 0; i < data.length; i++) {
+        for (let i = 0; i < data.length; i++) {     
             vertex_shader(i);
         }
-    
+
         // Call Fragment Shader
         if (data_uv.length != 0) {
             for (let i = 0; i < tri_buffer.length; i++) {
@@ -211,8 +233,7 @@ function vertex_shader(i) {
     let norm = vector.norm(vector.cp(l1, l2));
 
     // Only render if the triangle is facing the camera
-
-    if (vector.dp(norm, vector.sub(proj_tri[0], cam_loc)) < 0 || backface_culling) {
+    if (vector.dp(norm, vector.sub(proj_tri[0], cam_loc)) < 0) {
 
         // Calculate Global Illumination
         let shadow = Math.min(1, Math.max(0.5, vector.dp(light_dir, norm)));
@@ -223,7 +244,6 @@ function vertex_shader(i) {
         proj_tri[2] = matrix.mult_vec(view_mat, proj_tri[2]);
 
         // Clip triangles
-        // todo: add side clipping plane
         let clip_tri = [structuredClone(proj_tri)];
         let clip_tex = [structuredClone(proj_tex)];
 
