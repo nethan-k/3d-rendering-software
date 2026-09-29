@@ -135,8 +135,8 @@ const matrix = {
      * @returns {matrix} Product
      */
     mult_vec: (m, i) => {
-        if (!m[3]) m[3] = [0, 0, 0];
-        if (!i[3]) i[3] = 0;
+        if (!m[3]) m[3] = [0, 0, 0, 1];
+        if (!i[3]) i[3] = 1;
 
         return [
             i[0] * m[0][0] + i[1] * m[1][0] + i[2] * m[2][0] + i[3] * m[3][0],
@@ -273,7 +273,7 @@ const matrix = {
         cam_mat[0] = [   new_right[0],   new_right[1],   new_right[2], 0];
         cam_mat[1] = [      new_up[0],      new_up[1],      new_up[2], 0];
         cam_mat[2] = [ new_forward[0], new_forward[1], new_forward[2], 0];
-        cam_mat[3] = [         pos[0],         pos[1],         pos[2], 0];
+        cam_mat[3] = [         pos[0],         pos[1],         pos[2], 1];
 
         // Invert to get view matrix
         let view_mat = matrix.create(4, 4);
